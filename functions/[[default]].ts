@@ -152,6 +152,7 @@ export async function onRequest({ request }: { request: EORequest }) {
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-store',   // 错误响应绝不缓存
         }
       }
     );
@@ -184,6 +185,12 @@ export async function onRequest({ request }: { request: EORequest }) {
     headers.set('User-Agent', 'Mozilla/5.0 (compatible; GitHub-Proxy/1.0)');
   }
 
+  // 带私有仓库凭据的请求一律不缓存（缓存键只有 URL，缓存了会把私有内容暴露给所有人）
+  const isPrivate =
+    !!headers.get('Authorization') ||
+    /https:\/\/[^:]+:[^@]+@/.test(url.pathname) ||
+    /[?&](token|access_token|X-Amz-Signature|sig)=/i.test(targetUrl);
+
   // 处理请求体
   const method = request.method.toUpperCase();
   const hasBody = !['GET', 'HEAD'].includes(method);
@@ -212,6 +219,16 @@ export async function onRequest({ request }: { request: EORequest }) {
     // 禁止搜索引擎索引代理内容
     newResponse.headers.set('X-Robots-Tag', 'noindex, nofollow, nosnippet, noarchive');
 
+    // 缓存策略：公开的 release 资产不可变，长缓存；其余公开内容短缓存；
+    // 带凭据的一律不缓存。浏览器/边缘命中缓存后，重复下载不再走跨境链路。
+    if (isPrivate || response.status !== 200) {
+      newResponse.headers.set('Cache-Control', 'no-store');
+    } else if (gitPath.path.includes('/releases/download/')) {
+      newResponse.headers.set('Cache-Control', 'public, max-age=86400, immutable');
+    } else {
+      newResponse.headers.set('Cache-Control', 'public, max-age=600');
+    }
+
     // 对于某些内容类型，设置合适的 Content-Disposition
     const contentType = response.headers.get('Content-Type');
     if (contentType && (contentType.includes('application/zip') || 
@@ -234,6 +251,7 @@ export async function onRequest({ request }: { request: EORequest }) {
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-store',
         }
       }
     );
