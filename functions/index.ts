@@ -246,18 +246,6 @@ export async function onRequestOptions() {
 // 处理根路径请求 - 显示首页
 export async function onRequest({ request }: { request: EORequest }) {
   if (request.method === 'GET') {
-    // 检查客户端地理位置，如果是中国IP则返回404
-    const geo = request.eo?.geo;
-    if (geo && geo.countryCodeAlpha2 === 'CN') {
-      return new Response('Not Found', {
-        status: 404,
-        headers: {
-          'Content-Type': 'text/plain; charset=UTF-8',
-          'X-Robots-Tag': 'noindex, nofollow, nosnippet, noarchive',
-        }
-      });
-    }
-    
     return createHomePage();
   }
   

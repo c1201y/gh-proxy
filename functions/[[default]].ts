@@ -128,7 +128,15 @@ function handleGitClonePath(path: string, hostname: string): { hostname: string;
 // 处理所有请求（除了根路径，根路径由 index.ts 处理）
 export async function onRequest({ request }: { request: EORequest }) {
   const url = new URL(request.url);
-  
+
+  // 浏览器会自动请求 /favicon.ico，不要在兜底路由里把它变成 400
+  if (url.pathname === '/favicon.ico') {
+    return new Response(null, {
+      status: 204,
+      headers: { 'Cache-Control': 'public, max-age=86400' },
+    });
+  }
+
   // 解析目标 GitHub URL
   const githubInfo = parseGitHubUrl(request.url);
   
